@@ -28,6 +28,9 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
       - name: Install AWS SAM CLI
         run: |
           pip install aws-sam-cli
@@ -51,6 +54,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy SAM app
+        if: github.ref == 'refs/heads/main'
         run: |
           sam deploy \
             --no-confirm-changeset \
@@ -58,7 +62,9 @@ jobs:
             --stack-name sam-hello-world \
             --capabilities CAPABILITY_IAM \
             --region $AWS_REGION
+
       - name: Test deployed endpoint
+        if: github.ref == 'refs/heads/main'
         run: |
           URL=$(aws cloudformation describe-stacks \
             --stack-name sam-hello-world \
