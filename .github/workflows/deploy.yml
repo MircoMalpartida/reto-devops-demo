@@ -1,0 +1,70 @@
+name: Deploy SAM App
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Install AWS SAM CLI
+        run: |
+          pip install aws-sam-cli
+
+      - name: Run tests
+        run: |
+          pytest
+
+      - name: Validate SAM template
+        run: |
+          sam validate
+
+      - name: Build SAM app
+        run: |
+          sam build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy SAM app
+        run: |
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --stack-name sam-hello-world \
+            --capabilities CAPABILITY_IAM \
+            --region $AWS_REGION
+      - name: Test deployed endpoint
+        run: |
+          URL=$(aws cloudformation describe-stacks \
+            --stack-name sam-hello-world \
+            --query "Stacks[0].Outputs[?OutputKey=='HelloApi'].OutputValue" \
+            --output text)
+
+          echo "Testing $URL"
+
+          curl -s $URL | grep "Hello World"
